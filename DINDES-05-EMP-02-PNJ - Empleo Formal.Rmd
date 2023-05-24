@@ -1,0 +1,421 @@
+---
+title: "DINDES-05-EMP-02-PNJ - TASA DE EMPLEO FORMAL DE LA POBLACIÓN JOVEN ENTRE 15 Y 29 AÑOS" 
+author: "Dirección de Investigación y Desarrollo (DINDES) de la Secretaría Nacional de Juventud (SENAJU). Especialistas a cargo: Gianmarco Muñoz Bazán & Manuel Vargas de la Torre"
+date: "2023-05-23" 
+output:
+  html_document: 
+      toc: yes 
+      toc_depth: 3 
+      toc_float: yes 
+      collapsed: yes 
+      smooth_scroll: yes 
+      theme: journal 
+      highlight: kate 
+      df_print: paged 
+      code_folding: show 
+--- 
+# MODELADO DE BASE DATO 
+## PAQUETES ESTADÍSTICOS 
+```{r message=FALSE, warning=FALSE} 
+library(openxlsx) 
+library(rmarkdown) 
+library(tidyverse) 
+library(haven) 
+library(foreign) 
+library(survey) 
+``` 
+
+## GENERAMOS UNA RUTA PARA GUARDAR NUESTROS DATOS 
+Una ruta hacia una carpeta donde almacenaremos los excel que se elaborarán posteriormente, que contarán con dataset de información construida. 
+```{r} 
+ruta <- "C:/Users/Trabajo/Desktop/RDATA" 
+``` 
+
+## CARGAR BASES DE DATOS Y UNION DE BASES DE DATOS 
+```{r message=FALSE, warning=FALSE, rows.print=5} 
+#choose.files()
+#sumaria2018 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SUMARIA - 759-Modulo34\\Sumaria-2021.sav")
+#sumaria2019 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SUMARIA - 759-Modulo34\\Sumaria-2021.sav")
+#sumaria2020 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SUMARIA - 759-Modulo34\\Sumaria-2021.sav")
+#sumaria2021 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SUMARIA - 759-Modulo34\\Sumaria-2021.sav")
+sumaria2022 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO\\SUMARIA - 759-Modulo34\\Sumaria-2022.sav")
+
+#empleo2018 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\EMPLEO - 759-Modulo05\\Enaho01A-2021-500.sav")
+#empleo2019 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\EMPLEO - 759-Modulo05\\Enaho01A-2021-500.sav")
+#empleo2020 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\EMPLEO - 759-Modulo05\\Enaho01A-2021-500.sav")
+#empleo2021 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\EMPLEO - 759-Modulo05\\Enaho01A-2021-500.sav")
+empleo2022 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO\\EMPLEO - 759-Modulo05\\Enaho01a-2022-500.sav")
+
+#educacion2018 <- read_spss("C:\\Users\\DINDES08\\Desktop\\ENAHO\\2022\\Educacion - 2022 - 784-Modulo03\\Enaho01A-2022-300.sav")
+#educacion2019 <- read_spss("C:\\Users\\DINDES08\\Desktop\\ENAHO\\2022\\Educacion - 2022 - 784-Modulo03\\Enaho01A-2022-300.sav")
+#educacion2020 <- read_spss("C:\\Users\\DINDES08\\Desktop\\ENAHO\\2022\\Educacion - 2022 - 784-Modulo03\\Enaho01A-2022-300.sav")
+#educacion2021 <- read_spss("C:\\Users\\DINDES08\\Desktop\\ENAHO\\2022\\Educacion - 2022 - 784-Modulo03\\Enaho01A-2022-300.sav")
+educacion2022 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO\\EDUACIÓN - 759-Modulo03\\Enaho01A-2022-300.sav")
+
+#alud2018 <- read_dta("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SALUD - 759-Modulo04\\enaho01a-2018-400.dta")
+#salud2019 <- read_dta("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SALUD - 759-Modulo04\\enaho01a-2019-400.dta")
+#salud2020 <- read_dta("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SALUD - 759-Modulo04\\enaho01a-2020-400.dta")
+#salud2021 <- read_dta("C:\\Users\\Trabajo\\Desktop\\ENAHO 2021\\SALUD - 759-Modulo04\\enaho01a-2021-400.dta")
+salud2022 <- read_spss("C:\\Users\\Trabajo\\Desktop\\ENAHO\\SALUD - 759-Modulo04\\Enaho01A-2022-400.sav")
+
+educacion2022 <- subset(educacion2022, select = c(CODPERSO,CONGLOME,VIVIENDA,HOGAR,P300A))
+salud2022 <- subset(salud2022, select = c(CODPERSO,CONGLOME,VIVIENDA,HOGAR,P401H1,P401H2,P401H3,P401H4,P401H5,P401H6))
+sumaria2022 <- subset(sumaria2022, select = c(CONGLOME,VIVIENDA,HOGAR,POBREZA))
+
+enaho0 <- left_join(empleo2022, educacion2022, by=c("CODPERSO","CONGLOME", "VIVIENDA", "HOGAR"))
+enaho1 <- left_join(enaho0, salud2022, by=c("CODPERSO","CONGLOME", "VIVIENDA", "HOGAR"))
+enaho <- left_join(enaho1,sumaria2022, by =c("CONGLOME","VIVIENDA","HOGAR"))
+
+``` 
+# ELABORACION DE VARIABLES PARA DESAGREGACIONES 
+## VARIABLES TRANSVERSALES 
+Aquellas variables que nos sirven para realizar las desagregaciones posteriores. 
+
+### DEPARTAMENTOS 
+Hay que convertir la variable ubigeo.x (el ".x" es producto de la unión de bases de datos) a numérico para no encontrar problemas al momento de recodificar
+```{r} 
+enaho$ubigeonum <- as.numeric(enaho$UBIGEO)
+enaho <- enaho %>%
+  mutate(regiones2 = 
+           ifelse(ubigeonum >= 010101 & ubigeonum <= 010707, "Amazonas",
+           ifelse(ubigeonum >= 020101 & ubigeonum <= 022008, "Ancash",
+           ifelse(ubigeonum >= 030101 & ubigeonum <= 030714, "Apurimac",
+           ifelse(ubigeonum >= 040101 & ubigeonum <= 040811, "Arequipa",
+           ifelse(ubigeonum >= 050101 & ubigeonum <= 051108, "Ayacucho",
+           ifelse(ubigeonum >= 060101 & ubigeonum <= 061311, "Cajamarca",
+           ifelse(ubigeonum >= 070101 & ubigeonum <= 070107, "Callao",
+           ifelse(ubigeonum >= 080101 & ubigeonum <= 081307, "Cusco",
+           ifelse(ubigeonum >= 090101 & ubigeonum <= 090723, "Huancavelica",
+           ifelse(ubigeonum >= 100101 & ubigeonum <= 101108, "Huanuco",
+           ifelse(ubigeonum >= 110101 & ubigeonum <= 110508, "Ica",
+           ifelse(ubigeonum >= 120101 & ubigeonum <= 120909, "Junin",
+           ifelse(ubigeonum >= 130101 & ubigeonum <= 131203, "La Libertad",
+           ifelse(ubigeonum >= 140101 & ubigeonum <= 140312, "Lambayeque",
+           ifelse(ubigeonum >= 150101 & ubigeonum <= 150143, "Lima Metropolitana",
+           ifelse(ubigeonum >= 150201 & ubigeonum <= 151033, "Lima Region",
+           ifelse(ubigeonum >= 160101 & ubigeonum <= 160804, "Loreto",
+           ifelse(ubigeonum >= 170101 & ubigeonum <= 170303, "Madre de Dios",
+           ifelse(ubigeonum >= 180101 & ubigeonum <= 180303, "Moquegua",
+           ifelse(ubigeonum >= 190101 & ubigeonum <= 190308, "Pasco",
+           ifelse(ubigeonum >= 200101 & ubigeonum <= 200806, "Piura",
+           ifelse(ubigeonum >= 210101 & ubigeonum <= 211307, "Puno",
+           ifelse(ubigeonum >= 220101 & ubigeonum <= 221005, "San Martín",
+           ifelse(ubigeonum >= 230101 & ubigeonum <= 230408, "Tacna",
+           ifelse(ubigeonum >= 240101 & ubigeonum <= 240304, "Tumbes",
+           ifelse(ubigeonum >= 250101 & ubigeonum <= 250401,"Ucayali",NA)))))))))))))))))))))))))))
+table(enaho$regiones2, useNA = "alw")
+``` 
+### REGIONES NATURALES
+```{r} 
+enaho <- enaho %>%
+  mutate(regnat = ifelse(DOMINIO>=1 & DOMINIO<=3 | DOMINIO==8,"Costa",
+                         ifelse(DOMINIO>=4 & DOMINIO<=6,"Sierra",
+                                ifelse(DOMINIO==7,"Selva",NA))))
+table(enaho$regnat, useNA = "alw")
+``` 
+### ÁREA URBANA/RURAL 
+
+```{r} 
+enaho <- enaho %>%
+  mutate(area = ifelse((DOMINIO==8 |
+                          (DOMINIO>=1 & DOMINIO<=7) &
+                          (ESTRATO>=1 & ESTRATO<=5)), "Urbano",
+                       ifelse(((DOMINIO>=1 & DOMINIO<=7) &
+                                 (ESTRATO>=6 & ESTRATO<=8)), "Rural", NA)))
+table(enaho$area, useNA = "alw")
+``` 
+### CONDICIÓN DE POBREZA 
+```{r} 
+enaho <- enaho %>%
+  mutate(pobreza3 = ifelse(POBREZA==1, "Pobre extremo",
+                           ifelse(POBREZA==2, "Pobre no extremo",
+                                  ifelse(POBREZA==3, "No pobre", NA
+                                  ))))
+table(enaho$pobreza3, useNA = "alw")
+``` 
+### LENGUA MATERNA
+```{r}
+enaho <- enaho %>%
+  mutate(lengua = ifelse(P300A==4, "Castellano",
+                         ifelse(P300A==1 | P300A==2 | P300A==3, "Originaria", NA)))
+
+enaho$lengua <- as.factor(enaho$lengua)
+table(enaho$lengua, useNA = "alw")
+```
+### DISCAPACIDAD 
+```{r} 
+enaho <- enaho %>%
+  mutate(discapacidad =ifelse(P401H1==1|P401H2==1|P401H3==1|
+                                P401H4==1|P401H5==1|P401H6==1,1,0))
+table(enaho$discapacidad, useNA = "alw")
+``` 
+### ETNICIDAD 
+```{r} 
+table(enaho$P558C, useNA = "alw")
+enaho <- enaho %>%
+  mutate(defiet2 = case_when(
+    P558C == 1 ~ "Quechua",
+    P558C == 2 ~ "Aimara",
+    P558C == 3 ~ "Nativo o indigena de la Amazonia",
+    P558C == 4 ~ "Negro/Moreno/Zambo/Mulato/Pueblo Afro peruano o Afrodescendiente",
+    P558C == 5 ~ "Blanco",
+    P558C == 6 ~ "Mestizo",
+    P558C == 7 ~ "otro",
+    P558C == 8 ~ "No sabe/No responde",
+    P558C == 9 ~ "Nativo o indigena de la Amazonia",
+    TRUE ~ NA_character_
+  ))
+enaho$defiet2 <- as.factor(enaho$defiet2)
+table(enaho$defiet2, useNA = "alw")
+``` 
+
+## VARIABLES INDICADOR  
+### VARIABLE RESIDENTE 
+```{r} 
+table(enaho$P204)
+enaho <- enaho %>%
+  mutate(res = ifelse((P204==1 & P205==2)|(P204==2 & P206==1),"Residente","No residente"))
+enaho$res <- as.factor(enaho$res)
+table(enaho$res, useNA = "alw")
+``` 
+
+### VARIABLE PEA
+```{r} 
+enaho <- enaho %>%
+  mutate(pea = ifelse(P208A>=14 & res=="Residente" & (OCU500==1 | OCU500==2),"PEA","NO PEA"))
+enaho$pea <- as.factor(enaho$pea)
+table(enaho$pea, useNA = "alw")
+``` 
+
+### VARIABLE OCUPADOS
+```{r}
+enaho <- enaho %>%
+  mutate(ocupado = ifelse(P208A>=14 & P208A<=98 & res=="Residente" & OCU500==1,"Ocupado","No Ocupado"))
+enaho$ocupado <- as.factor(enaho$ocupado)
+table(enaho$ocupado, useNA = "alw")
+
+enaho$resid14 <- 
+  ifelse(((enaho$P204==1 & enaho$P205==2)|(enaho$P204==2 & enaho$P206==1)) & enaho$P208A>=14 & enaho$CODINFOR != "00", 1, 0)
+table(enaho$resid14, useNA = "alw")
+```
+
+### VARIABLE: OCUPADO FORMAL
+```{r}
+#OCUPADO FORMAL
+enaho <- enaho %>% 
+  mutate (ocuformal = ifelse(OCUPINF==2 & resid14==1,1,0))
+table(enaho$ocuformal, useNA = "alw")
+
+enaho_filtrado <- enaho %>% 
+  filter(P208A >= 15 & P208A <= 29)
+
+table(enaho_filtrado$ocuformal, enaho_filtrado$pea)
+```
+
+# PONDERACIÓN DE DATOS, DATASETS Y TRASLADO A EXCEL 
+## DISEÑO MUESTRAL 
+```{r} 
+encuesta = svydesign(data=enaho_filtrado, id=~CONGLOME, strata=~ESTRATO,
+                     weights=~FAC500A)
+``` 
+
+## DESAGREGACIÓN NACIONAL 
+```{r} 
+tabla0 <- svyby(~ocuformal, ~pea, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla0
+ic0 <-as.table(confint(tabla0)) #INTERVALOS DE CONFIANZA
+ic0
+cv0 <-cv(tabla0) #COEFICIENTE DE VARIACIÓN
+cv0
+
+workbook0 <- createWorkbook()
+addWorksheet(workbook0, sheetName = "Tabla 0")
+addWorksheet(workbook0, sheetName = "IC 0")
+addWorksheet(workbook0, sheetName = "CV 0")
+
+writeData(workbook0, sheet = "Tabla 0", x = tabla0, colNames = TRUE)
+writeData(workbook0, sheet = "IC 0", x = ic0, colNames = TRUE)
+writeData(workbook0, sheet = "CV 0", x = cv0, colNames = TRUE)
+
+saveWorkbook(workbook0, "datos0.xlsx")
+
+``` 
+
+## DESAGREGACIÓN SEGÚN SEXO
+```{r}
+tabla1 <- svyby(~ocuformal, ~pea+P207, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla1
+ic1 <-as.table(confint(tabla1)) #INTERVALOS DE CONFIANZA
+ic1
+cv1 <-cv(tabla1) #COEFICIENTE DE VARIACIÓN
+cv1
+
+workbook1 <- createWorkbook()
+addWorksheet(workbook1, sheetName = "Tabla 1")
+addWorksheet(workbook1, sheetName = "IC 1")
+addWorksheet(workbook1, sheetName = "CV 1")
+
+writeData(workbook1, sheet = "Tabla 1", x = tabla1, colNames = TRUE)
+writeData(workbook1, sheet = "IC 1", x = ic1, colNames = TRUE)
+writeData(workbook1, sheet = "CV 1", x = cv1, colNames = TRUE)
+
+saveWorkbook(workbook1, "datos1.xlsx")
+```
+
+## DESAGREGACIÓN SEGÚN ÁREA DE DOMICILIO (RURAL / URBANA) 
+```{r} 
+tabla2 <- svyby(~ocuformal, ~pea+area, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla2
+ic2 <-as.table(confint(tabla2)) #INTERVALOS DE CONFIANZA
+ic2
+cv2 <-cv(tabla2) #COEFICIENTE DE VARIACIÓN
+cv2
+
+workbook2 <- createWorkbook()
+addWorksheet(workbook2, sheetName = "Tabla 2")
+addWorksheet(workbook2, sheetName = "IC 2")
+addWorksheet(workbook2, sheetName = "CV 2")
+
+writeData(workbook2, sheet = "Tabla 2", x = tabla2, colNames = TRUE)
+writeData(workbook2, sheet = "IC 2", x = ic2, colNames = TRUE)
+writeData(workbook2, sheet = "CV 2", x = cv2, colNames = TRUE)
+
+saveWorkbook(workbook2, "datos2.xlsx")
+``` 
+
+## DESAGREGACIÓN SEGUN REGIÓN NATURAL (COSTA, SIERRA, SELVA) 
+```{r} 
+tabla3 <- svyby(~ocuformal, ~pea+regnat, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla3
+ic3 <-as.table(confint(tabla3)) #INTERVALOS DE CONFIANZA
+ic3
+cv3 <-cv(tabla3) #COEFICIENTE DE VARIACIÓN
+cv3
+
+workbook3 <- createWorkbook()
+addWorksheet(workbook3, sheetName = "Tabla 3")
+addWorksheet(workbook3, sheetName = "IC 3")
+addWorksheet(workbook3, sheetName = "CV 3")
+
+writeData(workbook3, sheet = "Tabla 3", x = tabla3, colNames = TRUE)
+writeData(workbook3, sheet = "IC 3", x = ic3, colNames = TRUE)
+writeData(workbook3, sheet = "CV 3", x = cv3, colNames = TRUE)
+
+saveWorkbook(workbook3, "datos3.xlsx")
+``` 
+
+## DESAGREGACIÓN SEGÚN DEPARTAMENTOS 
+```{r} 
+tabla4 <- svyby(~ocuformal, ~pea+regiones2, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla4
+ic4 <-as.table(confint(tabla4)) #INTERVALOS DE CONFIANZA
+ic4
+cv4 <-cv(tabla4) #COEFICIENTE DE VARIACIÓN
+cv4
+
+workbook4 <- createWorkbook()
+addWorksheet(workbook4, sheetName = "Tabla 4")
+addWorksheet(workbook4, sheetName = "IC 4")
+addWorksheet(workbook4, sheetName = "CV 4")
+
+writeData(workbook4, sheet = "Tabla 4", x = tabla4, colNames = TRUE)
+writeData(workbook4, sheet = "IC 4", x = ic4, colNames = TRUE)
+writeData(workbook4, sheet = "CV 4", x = cv4, colNames = TRUE)
+
+saveWorkbook(workbook4, "datos4.xlsx")
+
+``` 
+
+## DESAGREGACIÓN SEGUN CONDICIÓN DE POBREZA 
+```{r} 
+tabla5 <- svyby(~ocuformal, ~pea+pobreza3, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla5
+ic5 <-as.table(confint(tabla5)) #INTERVALOS DE CONFIANZA
+ic5
+cv5 <-cv(tabla5) #COEFICIENTE DE VARIACIÓN
+cv5
+
+workbook5 <- createWorkbook()
+addWorksheet(workbook5, sheetName = "Tabla 5")
+addWorksheet(workbook5, sheetName = "IC 5")
+addWorksheet(workbook5, sheetName = "CV 5")
+
+writeData(workbook5, sheet = "Tabla 5", x = tabla5, colNames = TRUE)
+writeData(workbook5, sheet = "IC 5", x = ic5, colNames = TRUE)
+writeData(workbook5, sheet = "CV 5", x = cv5, colNames = TRUE)
+
+saveWorkbook(workbook5, "datos5.xlsx")
+``` 
+
+## DESAGREGACIÓN SEGUN DISCAPACIDAD 
+```{r}
+tabla6 <- svyby(~ocuformal, ~pea+discapacidad, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO 
+tabla6
+ic6 <-as.table(confint(tabla6)) #INTERVALOS DE CONFIANZA 
+ic6
+cv6<-cv(tabla6) #COEFICIENTE DE VARIACIÓN 
+cv6
+
+workbook6 <- createWorkbook() 
+addWorksheet(workbook6, sheetName = "Tabla 6") 
+addWorksheet(workbook6, sheetName = "IC 6") 
+addWorksheet(workbook6, sheetName = "CV 6") 
+
+writeData(workbook6, sheet = "Tabla 6", x = tabla6, colNames = TRUE) 
+writeData(workbook6, sheet = "IC 6", x = ic6, colNames = TRUE) 
+writeData(workbook6, sheet = "CV 6", x = cv6, colNames = TRUE) 
+
+saveWorkbook(workbook6, "datos6.xlsx") 
+``` 
+
+## DESAGREGACIÓN SEGÚN ETNICIDAD 
+```{r} 
+tabla7 <- svyby(~ocuformal, ~pea+defiet2, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla7 
+ic7 <-as.table(confint(tabla7)) #INTERVALOS DE CONFIANZA 
+ic7 
+cv7 <-cv(tabla7) #COEFICIENTE DE VARIACIÓN 
+cv7 
+
+workbook7 <- createWorkbook() 
+addWorksheet(workbook7, sheetName = "Tabla 7")
+addWorksheet(workbook7, sheetName = "IC 7")
+addWorksheet(workbook7, sheetName = "CV 7")
+
+writeData(workbook7, sheet = "Tabla 7", x = tabla7, colNames = TRUE)
+writeData(workbook7, sheet = "IC 7", x = ic7, colNames = TRUE)
+writeData(workbook7, sheet = "CV 7", x = cv7, colNames = TRUE)
+
+saveWorkbook(workbook7, "datos7.xlsx")
+``` 
+
+## DESAGREGACION SEGÚN LENGUA MATERNA
+```{r}
+tabla8 <- svyby(~ocuformal, ~pea+lengua, encuesta, svymean, deff=F,na.rm=T) #PROMEDIO
+tabla8 
+ic8 <-as.table(confint(tabla8)) #INTERVALOS DE CONFIANZA 
+ic8 
+cv8 <-cv(tabla8) #COEFICIENTE DE VARIACIÓN 
+cv8 
+
+workbook8 <- createWorkbook() 
+addWorksheet(workbook8, sheetName = "Tabla 8")
+addWorksheet(workbook8, sheetName = "IC 8")
+addWorksheet(workbook8, sheetName = "CV 8")
+
+writeData(workbook8, sheet = "Tabla 8", x = tabla8, colNames = TRUE)
+writeData(workbook8, sheet = "IC 8", x = ic8, colNames = TRUE)
+writeData(workbook8, sheet = "CV 8", x = cv8, colNames = TRUE)
+
+saveWorkbook(workbook8, "datos8.xlsx")
+```
+
+
+# GUARDAR BD - opcional 
+```{r} 
+#save(enaho,file=paste(ruta,"BASEDEDATOSIndicador1ENDES.RData",sep = "/")) 
+#BORRAMOS TODO MENOS "RUTA" 
+#rm(list=setdiff(ls(), c("ruta"))) 
+#VOLVEMOS A CARGAR NUESTRA BD LIMPIA 
+#load(paste(ruta,"BASEDEDATOSIndicador1ENDES.RData",sep="/"))
+```
